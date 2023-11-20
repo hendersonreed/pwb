@@ -9,7 +9,18 @@ from mediapipe.tasks.python import vision
 
 import cv2 as cv
 
-model_path = '/home/reed/recurse/pwb-projector-whiteboard/hand_landmarker.task'
+
+##################
+# CONFIG OPTIONS #
+##################
+
+MODEL_PATH = '/home/reed/recurse/pwb-projector-whiteboard/hand_landmarker.task'
+WIDTH, HEIGHT = pg.size()
+
+
+###############
+# ACTUAL CODE #
+###############
 
 BaseOptions = mp.tasks.BaseOptions
 HandLandmarker = mp.tasks.vision.HandLandmarker
@@ -17,11 +28,11 @@ HandLandmarkerOptions = mp.tasks.vision.HandLandmarkerOptions
 HandLandmarkerResult = mp.tasks.vision.HandLandmarkerResult
 VisionRunningMode = mp.tasks.vision.RunningMode
 
+last_execution_time = time.time()
+time_threshold = 10
 
-WIDTH, HEIGHT = pg.size()
 
-
-def print_result(result: HandLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
+def track_finger_with_mouse(result: HandLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
     """
     it's in here that we need to evaluate the result
     1. move the mouse to the same x-y of the index finger tip using pyautogui
@@ -34,15 +45,18 @@ def print_result(result: HandLandmarkerResult, output_image: mp.Image, timestamp
     if len(result.hand_landmarks) > 0:
         x = int(result.hand_landmarks[0][8].x * WIDTH)
         y = int(result.hand_landmarks[0][8].y * HEIGHT)
-        print(f"would move to {x},{y}")
-        # we don't want to run `moveTo()` every time this function runs, rather we need to drop some percentage of them... could do it based on timestamp_ms?
-        pg.moveTo(x, y)
+
+        current_time = time.time()
+        if current_time - last_execution_time >= time_threshold:
+            print(f"moving to {x},{y}")
+            pg.moveTo(x, y)
+            last_execution_time = current_time
 
 
 options = HandLandmarkerOptions(
-    base_options=BaseOptions(model_asset_path=model_path),
+    base_options=BaseOptions(model_asset_path=MODEL_PATH),
     running_mode=VisionRunningMode.LIVE_STREAM,
-    result_callback=print_result)
+    result_callback=track_finger_with_mouse)
 with HandLandmarker.create_from_options(options) as landmarker:
     cap = cv.VideoCapture(0)
     while True:
